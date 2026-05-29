@@ -12,6 +12,25 @@ Inspirado en herramientas tipo [aurajobs.ai](https://aurajobs.ai/), pero pensado
 - **Persistencia automática** en `localStorage` + **importar/exportar JSON**.
 - Botones rápidos para cargar **datos de ejemplo** o **empezar desde cero**.
 - Personalización ligera: **color de acento**, **tamaño de fuente** y mostrar/ocultar la fecha de "Last updated".
+- **Adaptar el CV a una oferta de trabajo** (enfoque híbrido): análisis local gratis + IA opcional, generando una **variante adaptada** sin tocar tu CV original.
+
+## Adaptar a una oferta de trabajo
+
+Pega la descripción del puesto y la app genera una **variante adaptada** de tu CV. Tu CV original nunca se modifica: la variante se ve y se descarga desde la pestaña **"Adaptado"** de la vista previa.
+
+Funciona en dos niveles (híbrido):
+
+1. **Análisis local (gratis, privado, sin API key):** extrae las palabras clave de la oferta, calcula un **score de coincidencia (%)**, muestra qué keywords ya están en tu CV (verde) y cuáles faltan o conviene reforzar (ámbar). Además crea automáticamente una variante reordenando tu contenido existente (habilidades y logros más relevantes primero). No inventa nada.
+2. **Adaptar con IA (opcional, tu propia API key):** reescribe de forma breve y veraz el resumen y los logros para alinearlos con la oferta, sin inventar experiencia. Soporta:
+   - **OpenAI (GPT)** — modelo por defecto `gpt-4o-mini`
+   - **Anthropic (Claude)** — modelo por defecto `claude-3-5-haiku-latest`
+   - **Google (Gemini)** — modelo por defecto `gemini-1.5-flash`
+
+   El proveedor y el modelo se eligen en el panel "Configuración de IA". El costo de uso corre por tu cuenta (suele ser de centavos por CV).
+
+### Privacidad de la API key
+
+Tu API key se guarda **solo en este navegador** (`localStorage`) y se envía **directamente** al proveedor que elijas desde tu navegador. No pasa por ningún servidor intermedio y **no** se incluye al exportar tu CV en JSON.
 
 ## Requisitos
 
@@ -71,12 +90,15 @@ cv-builder/
     ├── config.ts                # enlaces de donación y repositorio
     ├── components/
     │   ├── ui.tsx               # inputs, cards y secciones reutilizables
-    │   └── ResumeForm.tsx       # formulario completo por secciones
+    │   ├── ResumeForm.tsx       # formulario completo por secciones
+    │   └── TailorPanel.tsx      # panel "Adaptar a una oferta"
     ├── pdf/
     │   └── ResumeDocument.tsx   # plantilla del PDF (react-pdf)
     └── lib/
         ├── sampleData.ts        # datos de ejemplo + plantilla vacía
-        └── storage.ts           # carga/guardado en localStorage
+        ├── storage.ts           # carga/guardado en localStorage
+        ├── jobMatch.ts          # análisis local de oferta + adaptación sin IA
+        └── ai.ts                # cliente multi-proveedor de IA (BYOK)
 ```
 
 ## Respaldar tus datos
@@ -88,4 +110,5 @@ Usa **Exportar JSON** para descargar un archivo con toda tu información. Para r
 - Múltiples plantillas/diseños de CV.
 - Varios perfiles de CV guardados a la vez.
 - Reordenar entradas por arrastre.
+- Editar la variante adaptada o aplicarla como nuevo CV base.
 - Sincronización opcional con un backend si algún día se necesita compartir.

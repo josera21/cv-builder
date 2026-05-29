@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PDFViewer, PDFDownloadLink, pdf } from "@react-pdf/renderer";
+import { PDFViewer, pdf } from "@react-pdf/renderer";
 import type { ResumeData } from "./types";
 import { ResumeDocument } from "./pdf/ResumeDocument";
 import { ResumeForm } from "./components/ResumeForm";
+import { TailorPanel } from "./components/TailorPanel";
 import { loadResume, saveResume } from "./lib/storage";
 import { sampleData, emptyData } from "./lib/sampleData";
 import { DONATION_URL, REPO_URL } from "./config";
+
+const VARIANT_STORAGE_KEY = "cv-builder:variant";
 
 /** Debounce so the (relatively heavy) PDF preview doesn't re-render on every keystroke. */
 function useDebounced<T>(value: T, delay: number): T {
@@ -17,8 +20,19 @@ function useDebounced<T>(value: T, delay: number): T {
   return debounced;
 }
 
+function loadVariant(): ResumeData | null {
+  try {
+    const raw = localStorage.getItem(VARIANT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as ResumeData) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [data, setData] = useState<ResumeData>(() => loadResume());
+  const [variant, setVariant] = useState<ResumeData | null>(() => loadVariant());
+  const [view, setView] = useState<"original" | "variant">("original");
   const debouncedData = useDebounced(data, 400);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,12 +40,35 @@ export default function App() {
     saveResume(data);
   }, [data]);
 
+  useEffect(() => {
+    try {
+      if (variant) localStorage.setItem(VARIANT_STORAGE_KEY, JSON.stringify(variant));
+      else localStorage.removeItem(VARIANT_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }, [variant]);
+
+  const showingVariant = view === "variant" && !!variant;
+  const activeData = showingVariant ? (variant as ResumeData) : debouncedData;
+  const downloadData = showingVariant ? (variant as ResumeData) : data;
+
   const fileSlug = useMemo(
     () => (data.contact.fullName || "resume").replace(/\s+/g, "-"),
     [data.contact.fullName],
   );
 
-  const previewDoc = useMemo(() => <ResumeDocument data={debouncedData} />, [debouncedData]);
+  const previewDoc = useMemo(() => <ResumeDocument data={activeData} />, [activeData]);
+
+  const handleVariant = (v: ResumeData) => {
+    setVariant(v);
+    setView("variant");
+  };
+
+  const clearVariant = () => {
+    setVariant(null);
+    setView("original");
+  };
 
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -62,11 +99,11 @@ export default function App() {
   };
 
   const downloadPdf = async () => {
-    const blob = await pdf(<ResumeDocument data={data} />).toBlob();
+    const blob = await pdf(<ResumeDocument data={downloadData} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${fileSlug}-CV.pdf`;
+    a.download = `${fileSlug}-CV${showingVariant ? "-adaptado" : ""}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -114,7 +151,7 @@ export default function App() {
             </a>
           ) : null}
           <button className="btn-primary" onClick={downloadPdf}>
-            Descargar PDF
+            Descargar PDF{showingVariant ? " (adaptado)" : ""}
           </button>
           <input
             ref={fileInputRef}
@@ -132,15 +169,17 @@ export default function App() {
 
       <main className="layout">
         <aside className="editor">
+          <TailorPanel
+            data={data}
+            onVariant={handleVariant}
+            hasVariant={!!variant}
+            onClearVariant={clearVariant}
+          />
           <ResumeForm data={data} onChange={setData} />
           <div className="editor-footer">
-            <PDFDownloadLink
-              document={<ResumeDocument data={data} />}
-              fileName={`${fileSlug}-CV.pdf`}
-              className="btn-primary block"
-            >
-              {({ loading }) => (loading ? "Preparando PDF…" : "Descargar PDF")}
-            </PDFDownloadLink>
+            <button className="btn-primary block" onClick={downloadPdf}>
+              Descargar PDF{showingVariant ? " (adaptado)" : ""}
+            </button>
             <p className="footer-note">
               Gratis y de código abierto.
               {DONATION_URL ? (
@@ -166,6 +205,22 @@ export default function App() {
         </aside>
 
         <section className="preview">
+          <div className="preview-tabs">
+            <button
+              className={`tab ${!showingVariant ? "tab-active" : ""}`}
+              onClick={() => setView("original")}
+            >
+              Original
+            </button>
+            <button
+              className={`tab ${showingVariant ? "tab-active" : ""}`}
+              onClick={() => variant && setView("variant")}
+              disabled={!variant}
+              title={variant ? "" : "Genera una variante en “Adaptar a una oferta”"}
+            >
+              Adaptado{variant ? "" : " (vacío)"}
+            </button>
+          </div>
           <PDFViewer className="pdf-viewer" showToolbar>
             {previewDoc}
           </PDFViewer>
